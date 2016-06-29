@@ -2,6 +2,7 @@
 package apollo
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -12,15 +13,22 @@ func handlerZero(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("h0\n"))
 }
 
-func handlerOne(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+func handlerOne(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
 	w.Write([]byte("h1\n"))
+	return nil
 }
 
-func handlerContext(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+func handlerContext(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
 	if value, ok := FromContext(ctx); ok {
 		contents := strconv.Itoa(value) + "\n"
 		w.Write([]byte(contents))
+		return nil
 	}
+	return fmt.Errorf("value not in context\n")
+}
+
+func handlerError(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+	return fmt.Errorf("err1\n")
 }
 
 func middleZero(h http.Handler) http.Handler {
@@ -31,16 +39,36 @@ func middleZero(h http.Handler) http.Handler {
 }
 
 func middleOne(h Handler) Handler {
-	return HandlerFunc(func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+	return HandlerFunc(func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
 		w.Write([]byte("m1\n"))
-		h.ServeHTTP(ctx, w, r)
+		return h.ServeHTTP(ctx, w, r)
 	})
 }
 
 func middleTwo(h Handler) Handler {
-	return HandlerFunc(func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+	return HandlerFunc(func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
 		w.Write([]byte("m2\n"))
-		h.ServeHTTP(ctx, w, r)
+		return h.ServeHTTP(ctx, w, r)
+	})
+}
+
+func middleAddError(h Handler) Handler {
+	return HandlerFunc(func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+		err := h.ServeHTTP(ctx, w, r)
+		w.Write([]byte("error:" + err.Error()))
+
+		return fmt.Errorf("found an error\n")
+	})
+}
+
+func middleHandleError(h Handler) Handler {
+	return HandlerFunc(func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+		err := h.ServeHTTP(ctx, w, r)
+		if err != nil {
+			w.Write([]byte("error:" + err.Error()))
+		}
+
+		return nil
 	})
 }
 
